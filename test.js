@@ -1,8 +1,8 @@
 process.env.NODE_ENV = 'test';
 
 const request = require('supertest');
-const app = require('../server');
-const { db, User, Factory, Resource } = require('../database/setup');
+const app = require('./server');
+const { db, User, Factory, Resource } = require('./database/setup');
 
 beforeAll(async () => {
     await db.sync({ force: true });
