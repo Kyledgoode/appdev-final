@@ -2,9 +2,14 @@ const { Sequelize, DataTypes } = require('sequelize');
 require('dotenv').config();
 
 // Database connection
+const dbName =
+    process.env.NODE_ENV === 'test'
+        ? 'test_satisfactory_inventory.db'
+        : (process.env.DB_NAME || 'satisfactory_inventory.db');
+
 const db = new Sequelize({
     dialect: process.env.DB_TYPE || 'sqlite',
-    storage: `database/${process.env.DB_NAME || 'satisfactory_inventory.db'}`,
+    storage: `database/${dbName}`,
     logging: false
 });
 
