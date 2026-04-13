@@ -26,10 +26,6 @@ const User = db.define('User', {
         validate: {
             isEmail: true
         }
-    },
-    password: {
-        type: DataTypes.STRING,
-        allowNull: false
     }
 });
 
