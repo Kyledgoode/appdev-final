@@ -9,6 +9,9 @@
     "setup": "node database/setup.js",
     "seed": "node database/seed.js"
   },
+  "engines": {
+  "node": ">=20.0.0 <22.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Kyledgoode/appdev-final.git"
