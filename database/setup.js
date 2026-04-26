@@ -13,7 +13,7 @@ const db = new Sequelize({
     logging: false
 });
 
-// User
+// User stores information for API users
 const User = db.define('User', {
     id: {
         type: DataTypes.INTEGER,
@@ -46,7 +46,8 @@ const User = db.define('User', {
     }
 });
 
-// Factory
+
+// Factory stores information for each Satisfactory factory in the game
 const Factory = db.define('Factory', {
     id: {
         type: DataTypes.INTEGER,
@@ -76,7 +77,7 @@ const Factory = db.define('Factory', {
     }
 });
 
-// Resource
+// Resource stores information for the resources in each factory in the game
 const Resource = db.define('Resource', {
     id: {
         type: DataTypes.INTEGER,

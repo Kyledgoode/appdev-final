@@ -56,7 +56,7 @@ Resources stored in a factory
 
 ## Relationships
 - One user has multiple inventories/factories
-- One inventory/factory can have multiple items
+- One inventory/factory can have multiple items in them
 
 ## Setup Instructions
 1. Clone the repository

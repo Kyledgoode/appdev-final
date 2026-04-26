@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { db, User, Factory, Resource } = require('./setup');
 
+//Resets tables and recreates them, also uses hashed passwords
 async function seedDatabase() {
     try {
         await db.sync({ force: true });
@@ -8,6 +9,7 @@ async function seedDatabase() {
 
         const hashedPassword = await bcrypt.hash('password123', 10);
 
+        //Creates sample users for testing
         const users = await User.bulkCreate([
             {
                 name: 'Kyle',
@@ -23,6 +25,7 @@ async function seedDatabase() {
             }
         ]);
 
+        //Creates sample factories for testing
         const factories = await Factory.bulkCreate([
             {
                 name: 'Iron Ingot Factory',
@@ -40,6 +43,7 @@ async function seedDatabase() {
             }
         ]);
 
+        //Creates sample resources for testing
         await Resource.bulkCreate([
             {
                 name: 'Iron Ore',

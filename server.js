@@ -9,11 +9,13 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+//Logging middleware
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.url}`);
     next();
 });
 
+//Tests database connection
 async function testConnection() {
     try {
         await db.authenticate();
@@ -25,6 +27,7 @@ async function testConnection() {
 
 testConnection();
 
+//Middleware protecting routes that require JWT tokens
 function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
 
@@ -36,6 +39,7 @@ function requireAuth(req, res, next) {
 
     const token = authHeader.substring(7);
 
+    //Verifies token and attaches user info to request object
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -54,6 +58,7 @@ function requireAuth(req, res, next) {
     }
 }
 
+//Middleware restricts some routes only to the admin role
 function requireAdmin(req, res, next) {
     if (!req.user) {
         return res.status(401).json({
@@ -70,12 +75,14 @@ function requireAdmin(req, res, next) {
     next();
 }
 
+//Makes sure the API is running
 app.get('/', (req, res) => {
     res.json({ message: 'Satisfactory Resource Inventory API is running.' });
 });
 
 // AUTH
 
+//Registers a new user with the player role
 app.post('/auth/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -117,6 +124,7 @@ app.post('/auth/register', async (req, res) => {
     }
 });
 
+//Logs in a user and returns a JWT token
 app.post('/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -170,6 +178,7 @@ app.post('/auth/login', async (req, res) => {
 
 // USERS
 
+//Returns all users
 app.get('/users', requireAuth, requireAdmin, async (req, res) => {
     try {
         const users = await User.findAll({
@@ -184,6 +193,7 @@ app.get('/users', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
+//Deletes a certain user by id, only admins are allowed to acces this route
 app.delete('/users/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
         const deletedRowsCount = await User.destroy({
@@ -203,6 +213,7 @@ app.delete('/users/:id', requireAuth, requireAdmin, async (req, res) => {
 
 // ITEMS
 
+//Returns all resources and their information
 app.get('/items', async (req, res) => {
     try {
         const items = await Resource.findAll({
@@ -221,6 +232,7 @@ app.get('/items', async (req, res) => {
     }
 });
 
+//Returns one resource by id
 app.get('/items/:id', async (req, res) => {
     try {
         const item = await Resource.findByPk(req.params.id, {
@@ -243,6 +255,7 @@ app.get('/items/:id', async (req, res) => {
     }
 });
 
+//Creates a new resource, have to be authenticated to access this route
 app.post('/items', requireAuth, async (req, res) => {
     try {
         const { name, category, quantityStored, factoryId } = req.body;
@@ -274,6 +287,7 @@ app.post('/items', requireAuth, async (req, res) => {
     }
 });
 
+//Updates a resource by id, have to be authenticated to access this route
 app.put('/items/:id', requireAuth, async (req, res) => {
     try {
         const { name, category, quantityStored, factoryId } = req.body;
@@ -307,6 +321,7 @@ app.put('/items/:id', requireAuth, async (req, res) => {
     }
 });
 
+//Deletes a resouce by id, have to be authenticated to access this route
 app.delete('/items/:id', requireAuth, async (req, res) => {
     try {
         const deletedRowsCount = await Resource.destroy({
@@ -326,6 +341,7 @@ app.delete('/items/:id', requireAuth, async (req, res) => {
 
 // INVENTORIES
 
+//Returns all inventories
 app.get('/inventories', async (req, res) => {
     try {
         const inventories = await Factory.findAll({
@@ -347,6 +363,7 @@ app.get('/inventories', async (req, res) => {
     }
 });
 
+//Returns an inventory by id
 app.get('/inventories/:id', async (req, res) => {
     try {
         const inventory = await Factory.findByPk(req.params.id, {
@@ -372,6 +389,7 @@ app.get('/inventories/:id', async (req, res) => {
     }
 });
 
+//Creates a new inventory, have to be authenticated to access this route
 app.post('/inventories', requireAuth, async (req, res) => {
     try {
         const { name, location, powerUsage, status, userId } = req.body;
@@ -404,6 +422,7 @@ app.post('/inventories', requireAuth, async (req, res) => {
     }
 });
 
+//Updates an inventory by id, have to be authenticated to access this route
 app.put('/inventories/:id', requireAuth, async (req, res) => {
     try {
         const { name, location, powerUsage, status, userId } = req.body;
@@ -438,6 +457,7 @@ app.put('/inventories/:id', requireAuth, async (req, res) => {
     }
 });
 
+//Deletes an inventory by id, have to be authenticated to access this route
 app.delete('/inventories/:id', requireAuth, async (req, res) => {
     try {
         const deletedRowsCount = await Factory.destroy({
@@ -455,15 +475,18 @@ app.delete('/inventories/:id', requireAuth, async (req, res) => {
     }
 });
 
+//Handles routes that don't exist
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
+//Catches server errors
 app.use((error, req, res, next) => {
     console.error('Server error:', error);
     res.status(500).json({ error: 'Internal server error' });
 });
 
+//Starts the server only if this file is run directly
 if (require.main === module) {
     app.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
