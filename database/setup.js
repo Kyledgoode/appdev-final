@@ -31,6 +31,18 @@ const User = db.define('User', {
         validate: {
             isEmail: true
         }
+    },
+    password: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    role: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: 'player',
+        validate: {
+            isIn: [['player', 'admin']]
+        }
     }
 });
 

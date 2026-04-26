@@ -1,11 +1,12 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { db, User, Factory, Resource } = require('./database/setup');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -13,7 +14,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Test connection
 async function testConnection() {
     try {
         await db.authenticate();
@@ -25,39 +25,64 @@ async function testConnection() {
 
 testConnection();
 
+function requireAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({
+            error: 'Authentication required'
+        });
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        req.user = {
+            id: decoded.id,
+            name: decoded.name,
+            email: decoded.email,
+            role: decoded.role
+        };
+
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            error: 'Invalid or expired token'
+        });
+    }
+}
+
+function requireAdmin(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({
+            error: 'Authentication required'
+        });
+    }
+
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({
+            error: 'Admin access required'
+        });
+    }
+
+    next();
+}
+
 app.get('/', (req, res) => {
     res.json({ message: 'Satisfactory Resource Inventory API is running.' });
 });
 
+// AUTH
 
-
-// Users
-// GET /users
-app.get('/users', async (req, res) => {
+app.post('/auth/register', async (req, res) => {
     try {
-        const users = await User.findAll({
-            include: [
-                {
-                    model: Factory
-                }
-            ]
-        });
+        const { name, email, password } = req.body;
 
-        res.json(users);
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Failed to fetch users' });
-    }
-});
-
-// POST /users
-app.post('/users', async (req, res) => {
-    try {
-        const { name, email } = req.body;
-
-        if (!name || !email) {
+        if (!name || !email || !password) {
             return res.status(400).json({
-                error: 'name and email are required'
+                error: 'name, email, and password are required'
             });
         }
 
@@ -68,48 +93,98 @@ app.post('/users', async (req, res) => {
             });
         }
 
-        const newUser = await User.create({ name, email });
-        res.status(201).json(newUser);
-    } catch (error) {
-        console.error('Error creating user:', error);
-        res.status(500).json({ error: 'Failed to create user' });
-    }
-});
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-// PUT /users/:id
-app.put('/users/:id', async (req, res) => {
-    try {
-        const { name, email } = req.body;
-
-        const user = await User.findByPk(req.params.id);
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        if (email && email !== user.email) {
-            const existingUser = await User.findOne({ where: { email } });
-            if (existingUser) {
-                return res.status(400).json({
-                    error: 'User with this email already exists'
-                });
-            }
-        }
-
-        await user.update({
-            name: name ?? user.name,
-            email: email ?? user.email
+        const newUser = await User.create({
+            name,
+            email,
+            password: hashedPassword,
+            role: 'player'
         });
 
-        res.json(user);
+        res.status(201).json({
+            message: 'User registered successfully',
+            user: {
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email,
+                role: newUser.role
+            }
+        });
     } catch (error) {
-        console.error('Error updating user:', error);
-        res.status(500).json({ error: 'Failed to update user' });
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Failed to register user' });
     }
 });
 
-// DELETE /users/:id
-app.delete('/users/:id', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                error: 'email and password are required'
+            });
+        }
+
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(401).json({
+                error: 'Invalid email or password'
+            });
+        }
+
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        if (!isValidPassword) {
+            return res.status(401).json({
+                error: 'Invalid email or password'
+            });
+        }
+
+        const token = jwt.sign(
+            {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+        );
+
+        res.json({
+            message: 'Login successful',
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Error logging in user:', error);
+        res.status(500).json({ error: 'Failed to login' });
+    }
+});
+
+// USERS
+
+app.get('/users', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const users = await User.findAll({
+            attributes: ['id', 'name', 'email', 'role'],
+            include: [{ model: Factory }]
+        });
+
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+app.delete('/users/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
         const deletedRowsCount = await User.destroy({
             where: { id: req.params.id }
@@ -126,8 +201,8 @@ app.delete('/users/:id', async (req, res) => {
     }
 });
 
-// ITEMS (RESOURCES)
-// GET /items
+// ITEMS
+
 app.get('/items', async (req, res) => {
     try {
         const items = await Resource.findAll({
@@ -146,7 +221,6 @@ app.get('/items', async (req, res) => {
     }
 });
 
-// GET /items/:id
 app.get('/items/:id', async (req, res) => {
     try {
         const item = await Resource.findByPk(req.params.id, {
@@ -169,8 +243,7 @@ app.get('/items/:id', async (req, res) => {
     }
 });
 
-// POST /items
-app.post('/items', async (req, res) => {
+app.post('/items', requireAuth, async (req, res) => {
     try {
         const { name, category, quantityStored, factoryId } = req.body;
 
@@ -201,8 +274,7 @@ app.post('/items', async (req, res) => {
     }
 });
 
-// PUT /items/:id
-app.put('/items/:id', async (req, res) => {
+app.put('/items/:id', requireAuth, async (req, res) => {
     try {
         const { name, category, quantityStored, factoryId } = req.body;
 
@@ -235,8 +307,7 @@ app.put('/items/:id', async (req, res) => {
     }
 });
 
-// DELETE /items/:id
-app.delete('/items/:id', async (req, res) => {
+app.delete('/items/:id', requireAuth, async (req, res) => {
     try {
         const deletedRowsCount = await Resource.destroy({
             where: { id: req.params.id }
@@ -253,15 +324,15 @@ app.delete('/items/:id', async (req, res) => {
     }
 });
 
-// INVENTORIES (FACTORIES)
-// GET /inventories
+// INVENTORIES
+
 app.get('/inventories', async (req, res) => {
     try {
         const inventories = await Factory.findAll({
             include: [
                 {
                     model: User,
-                    attributes: ['id', 'name', 'email']
+                    attributes: ['id', 'name', 'email', 'role']
                 },
                 {
                     model: Resource
@@ -276,14 +347,13 @@ app.get('/inventories', async (req, res) => {
     }
 });
 
-// GET /inventories/:id
 app.get('/inventories/:id', async (req, res) => {
     try {
         const inventory = await Factory.findByPk(req.params.id, {
             include: [
                 {
                     model: User,
-                    attributes: ['id', 'name', 'email']
+                    attributes: ['id', 'name', 'email', 'role']
                 },
                 {
                     model: Resource
@@ -302,8 +372,7 @@ app.get('/inventories/:id', async (req, res) => {
     }
 });
 
-// POST /inventories
-app.post('/inventories', async (req, res) => {
+app.post('/inventories', requireAuth, async (req, res) => {
     try {
         const { name, location, powerUsage, status, userId } = req.body;
 
@@ -335,8 +404,7 @@ app.post('/inventories', async (req, res) => {
     }
 });
 
-// PUT /inventories/:id
-app.put('/inventories/:id', async (req, res) => {
+app.put('/inventories/:id', requireAuth, async (req, res) => {
     try {
         const { name, location, powerUsage, status, userId } = req.body;
 
@@ -370,8 +438,7 @@ app.put('/inventories/:id', async (req, res) => {
     }
 });
 
-// DELETE /inventories/:id
-app.delete('/inventories/:id', async (req, res) => {
+app.delete('/inventories/:id', requireAuth, async (req, res) => {
     try {
         const deletedRowsCount = await Factory.destroy({
             where: { id: req.params.id }
@@ -388,8 +455,6 @@ app.delete('/inventories/:id', async (req, res) => {
     }
 });
 
-
-// ERROR HANDLING
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });

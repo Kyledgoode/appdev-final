@@ -1,24 +1,28 @@
+const bcrypt = require('bcryptjs');
 const { db, User, Factory, Resource } = require('./setup');
 
 async function seedDatabase() {
     try {
-        // Reset database
         await db.sync({ force: true });
         console.log('Database reset successfully.');
 
-        // Create sample users
+        const hashedPassword = await bcrypt.hash('password123', 10);
+
         const users = await User.bulkCreate([
             {
                 name: 'Kyle',
-                email: 'kyle@satisfactory.com'
+                email: 'kyle@satisfactory.com',
+                password: hashedPassword,
+                role: 'player'
             },
             {
-                name: 'Player2',
-                email: 'player2@satisfactory.com'
+                name: 'AdminUser',
+                email: 'admin@satisfactory.com',
+                password: hashedPassword,
+                role: 'admin'
             }
         ]);
 
-        // Create sample factories
         const factories = await Factory.bulkCreate([
             {
                 name: 'Iron Ingot Factory',
@@ -28,7 +32,7 @@ async function seedDatabase() {
                 userId: users[0].id
             },
             {
-                name: 'Copper Ingot Factory',
+                name: 'Copper Sheet Factory',
                 location: 'Rocky Desert',
                 powerUsage: 240,
                 status: 'active',
@@ -36,7 +40,6 @@ async function seedDatabase() {
             }
         ]);
 
-        // Create sample resources
         await Resource.bulkCreate([
             {
                 name: 'Iron Ore',
@@ -65,10 +68,8 @@ async function seedDatabase() {
         ]);
 
         console.log('Database seeded successfully!');
-        console.log('Sample users created:');
-        console.log('- kyle@satisfactory.com');
-        console.log('- player2@satisfactory.com');
-        console.log('Sample factories and resources created.');
+        console.log('- kyle@satisfactory.com / password123 / player');
+        console.log('- admin@satisfactory.com / password123 / admin');
     } catch (error) {
         console.error('Error seeding database:', error);
     } finally {
